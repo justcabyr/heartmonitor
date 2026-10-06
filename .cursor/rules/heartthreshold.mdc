@@ -1,0 +1,35 @@
+---
+description: HeartThreshold project rules — always follow the architecture guide and implementation plan
+alwaysApply: true
+---
+
+# HeartThreshold rules
+
+Source documents (read before making changes):
+- @docs/ARCHITECTURE.md — WHAT to build and the non-negotiable rules. Wins any conflict.
+- @docs/IMPLEMENTATION_PLAN.md — WHEN/in what order. Work only on the current phase.
+
+Non-negotiables:
+- The watch decides alerts AND records the session. No alert logic in TypeScript; the phone never edits samples.
+- Apple Watch: HKWorkoutSession + HKLiveWorkoutBuilder, activityType .other, locationType .indoor,
+  heart rate only, Workout processing background mode.
+- Record every heart-rate sample with its timestamp; never down-sample on the watch.
+  Append to disk at least every 60 s (buffered); never rewrite whole files mid-session.
+- Support sessions up to 10 hours: workout recovery, interrupted finalization, battery guard (default 10%),
+  wrist-down display updates at most once per minute. Alerts still evaluate every sample.
+- Never fabricate or interpolate heart-rate data; gaps are shown as gaps.
+- Phone ↔ Apple Watch only via WatchConnectivity through the `watch-bridge` native module.
+  Recordings: transferFile at session end; native module moves the file to the inbox before returning, then acks.
+  Settings (later phase): updateApplicationContext. Never App Groups for cross-device data. Nothing per-sample.
+- React Native screens import only the `WatchBridge` interface, never a platform adapter directly.
+- Watch source lives in apps/mobile/targets/watch. Never hand-edit generated `ios/`; use Expo config.
+- ThresholdEngine, SummaryCalculator and TS aggregation must pass the vectors in contracts/.
+- Validate every payload crossing a device or network boundary. Field names come from contracts/.
+- Watch-generated UUIDs are primary keys everywhere (idempotent import/sync).
+- No backend before Phase 11. The watch never calls the network or Supabase.
+- No fake sensor data outside tests/previews. Never swallow HealthKit, workout, file or transfer errors.
+- Wellness wording only; never claim diagnosis or emergency monitoring.
+
+Working style:
+- Small, testable types. TypeScript strict. Swift async/await; UI on main actor.
+- At the end of a task, list which "Done when" checks for the current phase now pass and which need a physical device.
