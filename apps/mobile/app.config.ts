@@ -15,7 +15,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   userInterfaceStyle: 'automatic',
   ios: {
     bundleIdentifier: 'com.justcabyr.heartthreshold',
-    appleTeamId: 'LST2XZLL7J',
+    appleTeamId: 'G7F58Z7BUB',
     supportsTablet: false,
     infoPlist: {
       NSHealthShareUsageDescription: shareUsage,
@@ -40,6 +40,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     '@bacons/apple-targets',
     './plugins/withWatchTarget',
     './plugins/withIosSceneLifecycle',
+    './plugins/withAutomaticSigning',
   ],
   experiments: {
     typedRoutes: false,
