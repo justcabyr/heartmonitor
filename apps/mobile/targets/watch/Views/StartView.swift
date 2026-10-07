@@ -2,6 +2,7 @@ import SwiftUI
 import ThresholdEngine
 
 struct StartView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var monitor: HeartRateMonitor
     @State private var showLive = false
     @State private var isStarting = false
@@ -35,10 +36,20 @@ struct StartView: View {
                         .foregroundStyle(.red)
                         .multilineTextAlignment(.center)
                 }
+                #if DEBUG
+                NavigationLink("Recordings") {
+                    RecordingsDebugView()
+                }
+                #endif
             }
             .padding()
             .navigationDestination(isPresented: $showLive) {
-                LiveView()
+                SessionScreen()
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .background {
+                    monitor.flushRecording()
+                }
             }
         }
     }

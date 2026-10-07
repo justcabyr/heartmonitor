@@ -1,6 +1,7 @@
 import Combine
 import Foundation
 import HealthKit
+import ThresholdEngine
 
 enum MonitoringSessionState: Equatable {
     case idle
@@ -41,12 +42,24 @@ final class HeartRateMonitor: NSObject, ObservableObject {
     @Published private(set) var authorizationState: HealthAuthorizationState = .notDetermined
     @Published private(set) var sessionState: MonitoringSessionState = .idle
     @Published private(set) var errorMessage: String?
+    @Published private(set) var finishedSummary: MonitoringSummary?
 
     private let healthStore = HKHealthStore()
+    private let recorder: SessionRecorder
     private var workoutSession: HKWorkoutSession?
     private var workoutBuilder: HKLiveWorkoutBuilder?
     private var frozenElapsed: TimeInterval = 0
     private var didFreezeElapsed = false
+    private var requestedEndReason: EndReason?
+    private var suppressAutomaticFinalize = false
+
+    override init() {
+        recorder = SessionRecorder()
+        super.init()
+        recorder.onRecordingError = { [weak self] error in
+            self?.errorMessage = error.localizedDescription
+        }
+    }
 
     var stateTitle: String {
         switch sessionState {
@@ -75,6 +88,22 @@ final class HeartRateMonitor: NSObject, ObservableObject {
         errorMessage = nil
         guard sessionState == .idle || sessionState == .ended else { return }
 
+        if recorder.hasOpenSession {
+            finalize(reason: .error, at: Date())
+            if recorder.hasOpenSession {
+                if errorMessage == nil {
+                    throw surface(
+                        RecordingStoreError.invalidBundle("The previous recording could not be saved.")
+                    )
+                }
+                throw RecordingStoreError.invalidBundle(
+                    errorMessage ?? "The previous recording could not be saved."
+                )
+            }
+        }
+
+        finishedSummary = nil
+        requestedEndReason = nil
         currentBPM = nil
         lastSampleDate = nil
         frozenElapsed = 0
@@ -105,9 +134,8 @@ final class HeartRateMonitor: NSObject, ObservableObject {
         workoutBuilder = builder
 
         let start = Date()
-        session.startActivity(with: start)
         do {
-            try await builder.beginCollection(at: start)
+            try recorder.start(settings: HeartRateSettings.startScreen, at: start)
         } catch {
             session.end()
             releaseWorkout()
@@ -116,6 +144,22 @@ final class HeartRateMonitor: NSObject, ObservableObject {
         }
 
         sessionState = .running
+        session.startActivity(with: start)
+        do {
+            try await builder.beginCollection(at: start)
+        } catch {
+            let endDate = Date()
+            freezeElapsed(using: builder, at: endDate)
+            requestedEndReason = .error
+            finalize(reason: .error, at: endDate)
+            session.end()
+            releaseWorkout()
+            sessionState = .ended
+            if finishedSummary != nil {
+                throw surface(error)
+            }
+            throw error
+        }
     }
 
     func pause() {
@@ -127,7 +171,15 @@ final class HeartRateMonitor: NSObject, ObservableObject {
     }
 
     func stopMonitoring(saveToHealth: Bool) async {
-        guard let session = workoutSession, let builder = workoutBuilder else { return }
+        guard let session = workoutSession, let builder = workoutBuilder else {
+            if recorder.hasOpenSession {
+                finalize(reason: .user, at: Date())
+            }
+            return
+        }
+
+        suppressAutomaticFinalize = true
+        requestedEndReason = .user
         let endDate = Date()
         freezeElapsed(using: builder, at: endDate)
 
@@ -135,14 +187,30 @@ final class HeartRateMonitor: NSObject, ObservableObject {
             if saveToHealth {
                 try await builder.endCollection(at: endDate)
                 _ = try await builder.finishWorkout()
-                session.end()
             } else {
                 builder.discardWorkout()
-                session.end()
             }
         } catch {
             errorMessage = error.localizedDescription
-            session.end()
+            requestedEndReason = .error
+        }
+
+        await Task.yield()
+        session.end()
+        await Task.yield()
+        if finishedSummary == nil {
+            finalize(reason: requestedEndReason ?? .user, at: endDate)
+        }
+        sessionState = .ended
+        releaseWorkout()
+        suppressAutomaticFinalize = false
+    }
+
+    func flushRecording() {
+        do {
+            try recorder.flush()
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -192,17 +260,34 @@ final class HeartRateMonitor: NSObject, ObservableObject {
         }
         currentBPM = bpm
         lastSampleDate = timestamp
+        do {
+            try recorder.recordSample(bpm: bpm, at: timestamp)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
-    private func applySessionState(_ state: HKWorkoutSessionState) {
+    private func applySessionState(_ state: HKWorkoutSessionState, at date: Date) {
         switch state {
         case .running:
+            if sessionState == .paused {
+                recordEvent(.resumed, at: date)
+            }
             sessionState = .running
         case .paused:
+            if sessionState == .running {
+                recordEvent(.paused, at: date)
+            }
             sessionState = .paused
         case .ended, .stopped:
             if let workoutBuilder {
-                freezeElapsed(using: workoutBuilder, at: Date())
+                freezeElapsed(using: workoutBuilder, at: date)
+            }
+            if suppressAutomaticFinalize {
+                break
+            }
+            if finishedSummary == nil {
+                finalize(reason: requestedEndReason ?? .interrupted, at: date)
             }
             sessionState = .ended
             releaseWorkout()
@@ -210,8 +295,31 @@ final class HeartRateMonitor: NSObject, ObservableObject {
             break
         @unknown default:
             errorMessage = "The workout session entered an unknown state."
+            if let workoutBuilder {
+                freezeElapsed(using: workoutBuilder, at: date)
+            }
+            if finishedSummary == nil {
+                finalize(reason: .error, at: date)
+            }
             sessionState = .ended
             releaseWorkout()
+        }
+    }
+
+    private func recordEvent(_ kind: SessionEventKind, at date: Date) {
+        do {
+            try recorder.record(kind: kind, at: date, flushImmediately: true)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func finalize(reason: EndReason, at date: Date) {
+        guard finishedSummary == nil else { return }
+        do {
+            finishedSummary = try recorder.finish(reason: reason, at: date)
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 
@@ -254,7 +362,7 @@ extension HeartRateMonitor: HKWorkoutSessionDelegate {
         date: Date
     ) {
         Task { @MainActor in
-            applySessionState(toState)
+            applySessionState(toState, at: date)
         }
     }
 
@@ -265,6 +373,9 @@ extension HeartRateMonitor: HKWorkoutSessionDelegate {
                 freezeElapsed(using: workoutBuilder, at: Date())
             }
             errorMessage = message
+            if finishedSummary == nil {
+                finalize(reason: .error, at: Date())
+            }
             sessionState = .ended
             releaseWorkout()
         }
