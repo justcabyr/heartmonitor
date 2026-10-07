@@ -1,5 +1,4 @@
 import SwiftUI
-import ThresholdEngine
 
 struct ControlsView: View {
     @EnvironmentObject private var monitor: HeartRateMonitor
@@ -35,7 +34,7 @@ struct ControlsView: View {
         .confirmationDialog("End session?", isPresented: $confirmEnd, titleVisibility: .visible) {
             Button("End", role: .destructive) {
                 Task {
-                    await monitor.stopMonitoring(saveToHealth: HeartRateSettings.startScreen.saveToHealth)
+                    await monitor.stopMonitoring(saveToHealth: monitor.settings.saveToHealth)
                 }
             }
             Button("Keep going", role: .cancel) {}
