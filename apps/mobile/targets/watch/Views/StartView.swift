@@ -4,11 +4,9 @@ import ThresholdEngine
 struct StartView: View {
     @Environment(\.scenePhase) private var scenePhase
     @EnvironmentObject private var monitor: HeartRateMonitor
-    @FocusState private var crownFocused: Bool
     @State private var showLive = false
     @State private var showSettings = false
     @State private var isStarting = false
-    @State private var crownTarget = HeartRateSettings.startScreen.targetBPM
 
     private var sessionIsOpen: Bool {
         monitor.sessionState == .running || monitor.sessionState == .paused
@@ -22,17 +20,11 @@ struct StartView: View {
                     Text("warn at \(Int(monitor.settings.warningBPM.rounded()))")
                         .foregroundStyle(.secondary)
                 }
-                .focusable()
-                .focused($crownFocused)
-                .digitalCrownRotation(
-                    $crownTarget,
-                    from: 60,
-                    through: 230,
-                    by: 1,
-                    sensitivity: .medium,
-                    isContinuous: false,
-                    isHapticFeedbackEnabled: true
-                )
+                if monitor.isRecovering {
+                    Text("Restoring session")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
                 if sessionIsOpen {
                     Button("View session") {
                         showLive = true
@@ -43,7 +35,7 @@ struct StartView: View {
                         Task { await start() }
                     }
                     .buttonStyle(.borderedProminent)
-                    .disabled(isStarting)
+                    .disabled(isStarting || monitor.isRecovering)
                 }
                 if let errorMessage = monitor.errorMessage {
                     Text(errorMessage)
@@ -71,21 +63,11 @@ struct StartView: View {
                 AlertSettingsSheet(settings: monitor.settings)
             }
             .onAppear {
-                crownTarget = monitor.settings.targetBPM.rounded()
-                crownFocused = true
+                presentRecoveredSession()
             }
-            .onChange(of: crownTarget) { _, newValue in
-                let rounded = newValue.rounded()
-                if rounded != newValue {
-                    crownTarget = rounded
-                    return
-                }
-                monitor.setTargetBPM(rounded)
-            }
-            .onChange(of: showSettings) { _, isShowing in
-                if !isShowing {
-                    crownTarget = monitor.settings.targetBPM.rounded()
-                    crownFocused = true
+            .onChange(of: monitor.openSessionScreen) { _, open in
+                if open {
+                    presentRecoveredSession()
                 }
             }
             .onChange(of: scenePhase) { _, phase in
@@ -94,6 +76,12 @@ struct StartView: View {
                 }
             }
         }
+    }
+
+    private func presentRecoveredSession() {
+        guard monitor.openSessionScreen else { return }
+        showLive = true
+        monitor.consumeOpenSessionScreen()
     }
 
     private func start() async {
@@ -111,25 +99,76 @@ struct StartView: View {
 private struct AlertSettingsSheet: View {
     @EnvironmentObject private var monitor: HeartRateMonitor
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var crownFocused: Bool
     @State private var warningPercent: Int
     @State private var saveToHealth: Bool
+    @State private var crownTarget: Double
 
     init(settings: HeartRateSettings) {
         _warningPercent = State(initialValue: Int((settings.warningFraction * 100).rounded()))
         _saveToHealth = State(initialValue: settings.saveToHealth)
+        _crownTarget = State(initialValue: settings.targetBPM.rounded())
     }
 
     var body: some View {
         ScrollView {
-            VStack(spacing: 12) {
-                Stepper(value: $warningPercent, in: 50...99) {
-                    Text("Warn at \(warningPercent)%")
+            VStack(spacing: 10) {
+                VStack(spacing: 2) {
+                    Text("Alert at \(Int(crownTarget.rounded())) BPM")
+                        .font(.body)
+                    Text("warn at \(Int(monitor.settings.warningBPM.rounded()))")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
+                .focusable()
+                .focused($crownFocused)
+                .digitalCrownRotation(
+                    $crownTarget,
+                    from: 60,
+                    through: 230,
+                    by: 1,
+                    sensitivity: .low,
+                    isContinuous: false,
+                    isHapticFeedbackEnabled: true
+                )
+                HStack(spacing: 6) {
+                    Button {
+                        warningPercent = max(50, warningPercent - 1)
+                    } label: {
+                        Image(systemName: "minus")
+                    }
+                    .accessibilityLabel("Lower warning")
+                    Text("Warn at\n\(warningPercent)%")
+                        .font(.subheadline)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity)
+                    Button {
+                        warningPercent = min(99, warningPercent + 1)
+                    } label: {
+                        Image(systemName: "plus")
+                    }
+                    .accessibilityLabel("Raise warning")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
                 Toggle("Save to Health", isOn: $saveToHealth)
+                    .font(.footnote)
                 Button("Done") {
                     dismiss()
                 }
             }
+        }
+        .onAppear {
+            crownFocused = true
+        }
+        .onChange(of: crownTarget) { _, newValue in
+            let rounded = newValue.rounded()
+            if rounded != newValue {
+                crownTarget = rounded
+                return
+            }
+            monitor.setTargetBPM(rounded)
         }
         .onChange(of: warningPercent) { _, percent in
             monitor.setWarningFraction(Double(percent) / 100)

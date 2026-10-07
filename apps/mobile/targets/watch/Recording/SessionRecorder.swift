@@ -17,8 +17,14 @@ final class SessionRecorder {
     private var flushTask: Task<Void, Never>?
 
     private struct OpenSession {
+        let id: UUID
         let folder: URL
         let startedAt: Date
+    }
+
+    enum Recovery {
+        case finished(MonitoringSummary)
+        case open(lastSampleDate: Date?)
     }
 
     init(store: RecordingStore? = nil) {
@@ -29,7 +35,12 @@ final class SessionRecorder {
         session != nil
     }
 
-    func start(settings: HeartRateSettings, at startedAt: Date) throws {
+    func ensureRoomToStart() throws {
+        try store.ensureRoomForSession()
+    }
+
+    @discardableResult
+    func start(settings: HeartRateSettings, at startedAt: Date) throws -> UUID {
         if session != nil {
             throw RecordingStoreError.invalidBundle("A recording is already open.")
         }
@@ -58,9 +69,35 @@ final class SessionRecorder {
             }
             throw error
         }
-        session = OpenSession(folder: folder, startedAt: stored.startedAt)
+        session = OpenSession(id: stored.id, folder: folder, startedAt: stored.startedAt)
         accepting = true
         scheduleFlush()
+        return stored.id
+    }
+
+    func prepareRecovery(id: UUID) throws -> Recovery {
+        if session != nil {
+            throw RecordingStoreError.invalidBundle("A recording is already open.")
+        }
+        let folder = try store.existingFolder(for: id)
+        let header = try store.readHeader(in: folder)
+        guard header.id == id else {
+            throw RecordingStoreError.invalidBundle("The session id does not match its folder.")
+        }
+        if let summary = try store.summaryIfPresent(in: folder) {
+            try store.ensureBundle(matching: summary, in: folder)
+            closedSummary = summary
+            return .finished(summary)
+        }
+        let samples = try store.readSamples(in: folder)
+        closedSummary = nil
+        pendingSamples = []
+        pendingEvents = []
+        session = OpenSession(id: header.id, folder: folder, startedAt: header.startedAt)
+        accepting = true
+        scheduleFlush()
+        let lastSampleDate = samples.map(\.offset).max().map { header.startedAt.addingTimeInterval($0) }
+        return .open(lastSampleDate: lastSampleDate)
     }
 
     func recordSample(bpm: Double, at timestamp: Date) throws {

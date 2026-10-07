@@ -4,18 +4,37 @@ import WatchKit
 @main
 struct HeartThresholdWatchApp: App {
     @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var appDelegate
-    @StateObject private var monitor = HeartRateMonitor()
 
     var body: some Scene {
         WindowGroup {
             StartView()
-                .environmentObject(monitor)
+                .environmentObject(appDelegate.monitor)
         }
     }
 }
 
+@MainActor
 final class WatchAppDelegate: NSObject, WKApplicationDelegate {
+    private var storedMonitor: HeartRateMonitor?
+
+    var monitor: HeartRateMonitor {
+        if let storedMonitor {
+            return storedMonitor
+        }
+        let created = HeartRateMonitor()
+        storedMonitor = created
+        return created
+    }
+
     func handleActiveWorkoutRecovery() {
-        // Phase 6 recovers the HealthKit session and reopens the recording.
+        monitor.recoverAfterCrash()
+    }
+
+    func applicationDidFinishLaunching() {
+        monitor.prepareForLaunchRecovery()
+        Task { @MainActor in
+            await Task.yield()
+            monitor.recoverInterruptedSessionIfNeeded()
+        }
     }
 }

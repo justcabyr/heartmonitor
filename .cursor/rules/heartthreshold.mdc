@@ -33,3 +33,4 @@ Non-negotiables:
 Working style:
 - Small, testable types. TypeScript strict. Swift async/await; UI on main actor.
 - At the end of a task, list which "Done when" checks for the current phase now pass and which need a physical device.
+- After watch or phone source changes, build and install without being asked. Build the HeartThreshold scheme for the connected iPhone (`-allowProvisioningUpdates`), then install `Debug-watchos/watch.app` on the paired Apple Watch and launch `com.justcabyr.heartthreshold.watchkitapp`. Install the iPhone app too when phone source changed.
