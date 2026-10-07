@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "session-recording.schema.json",
+  "title": "SessionRecording",
+  "description": "Finished session bundle sent from the watch to the phone. The phone does not edit samples.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "id",
+    "sourcePlatform",
+    "deviceModel",
+    "watchAppVersion",
+    "startedAt",
+    "settings",
+    "samples",
+    "events",
+    "summary"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Watch-generated id. Primary key on every later store."
+    },
+    "sourcePlatform": {
+      "type": "string",
+      "enum": ["watchos", "wearos", "garmin"]
+    },
+    "deviceModel": { "type": "string", "minLength": 1 },
+    "watchAppVersion": { "type": "string", "minLength": 1 },
+    "startedAt": { "type": "string", "format": "date-time" },
+    "settings": { "$ref": "heart-rate-settings.schema.json" },
+    "samples": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/heartRateSample" }
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sessionEvent" }
+    },
+    "summary": { "$ref": "#/$defs/monitoringSummary" }
+  },
+  "$defs": {
+    "heartRateSample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "bpm"],
+      "properties": {
+        "offset": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Seconds since startedAt, including paused time."
+        },
+        "bpm": { "type": "number" }
+      }
+    },
+    "sessionEvent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["offset", "kind"],
+      "properties": {
+        "offset": { "type": "number", "minimum": 0 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "warning",
+            "threshold",
+            "staleStart",
+            "staleEnd",
+            "paused",
+            "resumed",
+            "recovered",
+            "batteryGuard",
+            "settingsChanged"
+          ]
+        }
+      }
+    },
+    "monitoringSummary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "startedAt",
+        "endedAt",
+        "activeSeconds",
+        "sampleCount",
+        "avgBPM",
+        "minBPM",
+        "maxBPM",
+        "warningEvents",
+        "thresholdEvents",
+        "secondsAboveWarning",
+        "secondsAboveTarget",
+        "gapSeconds",
+        "endReason"
+      ],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "endedAt": { "type": "string", "format": "date-time" },
+        "activeSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Elapsed time excluding pauses."
+        },
+        "sampleCount": { "type": "integer", "minimum": 0 },
+        "avgBPM": { "type": "number" },
+        "minBPM": { "type": "number" },
+        "maxBPM": { "type": "number" },
+        "warningEvents": { "type": "integer", "minimum": 0 },
+        "thresholdEvents": { "type": "integer", "minimum": 0 },
+        "secondsAboveWarning": { "type": "number", "minimum": 0 },
+        "secondsAboveTarget": { "type": "number", "minimum": 0 },
+        "gapSeconds": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Active time between samples beyond the 60 second gap threshold."
+        },
+        "endReason": {
+          "type": "string",
+          "enum": ["user", "batteryGuard", "interrupted", "error"]
+        }
+      }
+    }
+  }
+}

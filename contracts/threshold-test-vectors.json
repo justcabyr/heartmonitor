@@ -1,0 +1,264 @@
+[
+  {
+    "name": "warning entry fires once, then cooldown suppresses",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 60,
+      "thresholdCooldown": 30,
+      "hysteresisBPM": 5
+    },
+    "samples": [
+      { "t": 0, "bpm": 150 },
+      { "t": 5, "bpm": 163 },
+      { "t": 10, "bpm": 165 },
+      { "t": 70, "bpm": 164 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "normal", "alert": null },
+      { "t": 5, "zone": "warning", "alert": "warning" },
+      { "t": 10, "zone": "warning", "alert": null },
+      { "t": 70, "zone": "warning", "alert": "warning" }
+    ]
+  },
+  {
+    "name": "zone boundaries are inclusive and escalation alerts the higher zone",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 600,
+      "thresholdCooldown": 600,
+      "hysteresisBPM": 5
+    },
+    "samples": [
+      { "t": 0, "bpm": 100 },
+      { "t": 10, "bpm": 161 },
+      { "t": 20, "bpm": 162 },
+      { "t": 30, "bpm": 179 },
+      { "t": 40, "bpm": 180 },
+      { "t": 50, "bpm": 200 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "normal", "alert": null },
+      { "t": 10, "zone": "normal", "alert": null },
+      { "t": 20, "zone": "warning", "alert": "warning" },
+      { "t": 30, "zone": "warning", "alert": null },
+      { "t": 40, "zone": "threshold", "alert": "threshold" },
+      { "t": 50, "zone": "threshold", "alert": null }
+    ]
+  },
+  {
+    "name": "warning hysteresis suppresses re-entry chatter until the boundary is cleared",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 600,
+      "thresholdCooldown": 600,
+      "hysteresisBPM": 5
+    },
+    "samples": [
+      { "t": 0, "bpm": 150 },
+      { "t": 5, "bpm": 163 },
+      { "t": 10, "bpm": 161 },
+      { "t": 15, "bpm": 164 },
+      { "t": 20, "bpm": 158 },
+      { "t": 25, "bpm": 157 },
+      { "t": 30, "bpm": 162 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "normal", "alert": null },
+      { "t": 5, "zone": "warning", "alert": "warning" },
+      { "t": 10, "zone": "normal", "alert": null },
+      { "t": 15, "zone": "warning", "alert": null },
+      { "t": 20, "zone": "normal", "alert": null },
+      { "t": 25, "zone": "normal", "alert": null },
+      { "t": 30, "zone": "warning", "alert": "warning" }
+    ]
+  },
+  {
+    "name": "threshold hysteresis suppresses re-entry chatter until the target is cleared",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 600,
+      "thresholdCooldown": 600,
+      "hysteresisBPM": 5
+    },
+    "samples": [
+      { "t": 0, "bpm": 150 },
+      { "t": 5, "bpm": 185 },
+      { "t": 10, "bpm": 176 },
+      { "t": 15, "bpm": 181 },
+      { "t": 20, "bpm": 175 },
+      { "t": 25, "bpm": 180 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "normal", "alert": null },
+      { "t": 5, "zone": "threshold", "alert": "threshold" },
+      { "t": 10, "zone": "warning", "alert": null },
+      { "t": 15, "zone": "threshold", "alert": null },
+      { "t": 20, "zone": "warning", "alert": null },
+      { "t": 25, "zone": "threshold", "alert": "threshold" }
+    ]
+  },
+  {
+    "name": "warning cooldown fires again at exactly the cooldown",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 60,
+      "thresholdCooldown": 30,
+      "hysteresisBPM": 5
+    },
+    "samples": [
+      { "t": 0, "bpm": 163 },
+      { "t": 60, "bpm": 164 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "warning", "alert": "warning" },
+      { "t": 60, "zone": "warning", "alert": "warning" }
+    ]
+  },
+  {
+    "name": "threshold cooldown repeats while heart rate stays at the target",
+    "settings": {
+      "targetBPM": 120,
+      "warningFraction": 0.5,
+      "warningCooldown": 600,
+      "thresholdCooldown": 30,
+      "hysteresisBPM": 1
+    },
+    "samples": [
+      { "t": 0, "bpm": 130 },
+      { "t": 29, "bpm": 130 },
+      { "t": 30, "bpm": 130 },
+      { "t": 59, "bpm": 130 },
+      { "t": 60, "bpm": 130 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "threshold", "alert": "threshold" },
+      { "t": 29, "zone": "threshold", "alert": null },
+      { "t": 30, "zone": "threshold", "alert": "threshold" },
+      { "t": 59, "zone": "threshold", "alert": null },
+      { "t": 60, "zone": "threshold", "alert": "threshold" }
+    ]
+  },
+  {
+    "name": "stale episode alerts once, ends on a fresh sample, and can start again",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 60,
+      "thresholdCooldown": 30,
+      "hysteresisBPM": 5,
+      "staleTimeout": 10
+    },
+    "samples": [
+      { "t": 0, "bpm": 100 },
+      { "t": 9 },
+      { "t": 10 },
+      { "t": 12 },
+      { "t": 13, "bpm": 100 },
+      { "t": 23 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "normal", "alert": null },
+      { "t": 9, "zone": "normal", "alert": null },
+      { "t": 10, "zone": "stale", "alert": "stale" },
+      { "t": 12, "zone": "stale", "alert": null },
+      { "t": 13, "zone": "normal", "alert": null },
+      { "t": 23, "zone": "stale", "alert": "stale" }
+    ]
+  },
+  {
+    "name": "stale episode does not alert from the old heart-rate sample",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 60,
+      "thresholdCooldown": 30,
+      "hysteresisBPM": 5,
+      "staleTimeout": 10
+    },
+    "samples": [
+      { "t": 0, "bpm": 185 },
+      { "t": 10 },
+      { "t": 20, "bpm": 185 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "threshold", "alert": "threshold" },
+      { "t": 10, "zone": "stale", "alert": "stale" },
+      { "t": 20, "zone": "threshold", "alert": null }
+    ]
+  },
+  {
+    "name": "settings change mid-session applies the new target immediately",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 60,
+      "thresholdCooldown": 30,
+      "hysteresisBPM": 5,
+      "staleTimeout": 10
+    },
+    "samples": [
+      { "t": 0, "bpm": 170 },
+      { "t": 10, "bpm": 170 },
+      {
+        "t": 15,
+        "bpm": 170,
+        "settings": {
+          "targetBPM": 160,
+          "warningFraction": 0.9,
+          "warningCooldown": 60,
+          "thresholdCooldown": 30,
+          "hysteresisBPM": 5,
+          "staleTimeout": 10
+        }
+      },
+      { "t": 20, "bpm": 170 },
+      { "t": 45, "bpm": 170 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "warning", "alert": "warning" },
+      { "t": 10, "zone": "warning", "alert": null },
+      { "t": 15, "zone": "threshold", "alert": "threshold" },
+      { "t": 20, "zone": "threshold", "alert": null },
+      { "t": 45, "zone": "threshold", "alert": "threshold" }
+    ]
+  },
+  {
+    "name": "settings change mid-session resets cooldowns",
+    "settings": {
+      "targetBPM": 180,
+      "warningFraction": 0.9,
+      "warningCooldown": 60,
+      "thresholdCooldown": 30,
+      "hysteresisBPM": 5,
+      "staleTimeout": 10
+    },
+    "samples": [
+      { "t": 0, "bpm": 170 },
+      { "t": 10, "bpm": 170 },
+      {
+        "t": 12,
+        "bpm": 170,
+        "settings": {
+          "targetBPM": 180,
+          "warningFraction": 0.9,
+          "warningCooldown": 60,
+          "thresholdCooldown": 30,
+          "hysteresisBPM": 5,
+          "staleTimeout": 10
+        }
+      },
+      { "t": 13, "bpm": 170 }
+    ],
+    "expected": [
+      { "t": 0, "zone": "warning", "alert": "warning" },
+      { "t": 10, "zone": "warning", "alert": null },
+      { "t": 12, "zone": "warning", "alert": "warning" },
+      { "t": 13, "zone": "warning", "alert": null }
+    ]
+  }
+]
