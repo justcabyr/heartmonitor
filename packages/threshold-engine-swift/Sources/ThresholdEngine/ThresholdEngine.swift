@@ -27,6 +27,12 @@ public struct ThresholdEngine {
         cooldownReset = true
     }
 
+    /// Restarts the stale clock from `now` without treating the previous BPM as a new sample.
+    public mutating func markFresh(at now: Date) {
+        lastSampleAt = now
+        isStale = false
+    }
+
     /// Time passed with no new sample. Alerts from the previous BPM stay off.
     public mutating func advance(to now: Date) -> ThresholdEvaluation {
         guard let lastSampleAt, now >= lastSampleAt else {

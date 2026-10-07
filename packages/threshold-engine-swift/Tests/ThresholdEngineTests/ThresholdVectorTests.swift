@@ -47,6 +47,33 @@ final class ThresholdVectorTests: XCTestCase {
         }
     }
 
+    func testMarkFreshRestartsTheStaleClockWithoutAlerting() {
+        let settings = HeartRateSettings(
+            targetBPM: 150,
+            warningFraction: 0.9,
+            warningCooldown: 60,
+            thresholdCooldown: 30,
+            hysteresisBPM: 5,
+            staleTimeout: 10,
+            batteryGuardLevel: 0.10,
+            saveToHealth: false
+        )
+        var engine = ThresholdEngine(settings: settings)
+        let start = Date(timeIntervalSince1970: 0)
+        let first = engine.evaluate(bpm: 100, at: start)
+        XCTAssertEqual(first.zone, .normal)
+        XCTAssertNil(first.alert)
+
+        let stale = engine.advance(to: start.addingTimeInterval(10))
+        XCTAssertEqual(stale.zone, .stale)
+        XCTAssertEqual(stale.alert, .stale)
+
+        engine.markFresh(at: start.addingTimeInterval(12))
+        let resumed = engine.advance(to: start.addingTimeInterval(13))
+        XCTAssertEqual(resumed.zone, .normal)
+        XCTAssertNil(resumed.alert)
+    }
+
     private func makeSettings(_ settings: ThresholdVector.Settings) -> HeartRateSettings {
         HeartRateSettings(
             targetBPM: settings.targetBPM,
