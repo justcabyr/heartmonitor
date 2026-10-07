@@ -16,7 +16,7 @@ final class HapticAlertService {
     }
 
     func batteryGuard() {
-        play([.retry])
+        play([.directionDown, .notification, .stop])
     }
 
     private func play(_ types: [WKHapticType]) {

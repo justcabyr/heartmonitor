@@ -5,6 +5,7 @@ import ThresholdEngine
 enum RecordingStoreError: LocalizedError {
     case documentsUnavailable
     case noActiveSession
+    case notEnoughStorage
     case invalidLine
     case invalidBundle(String)
 
@@ -14,6 +15,8 @@ enum RecordingStoreError: LocalizedError {
             return "The recording folder is not available."
         case .noActiveSession:
             return "There is no recording to save."
+        case .notEnoughStorage:
+            return "Not enough free space for a long session. Free at least 5 MB, then start again."
         case .invalidLine:
             return "The recording has an unreadable line."
         case .invalidBundle(let reason):
@@ -300,6 +303,83 @@ struct RecordingStore {
 
     func removeFolder(_ folder: URL) throws {
         try FileManager.default.removeItem(at: folder)
+    }
+
+    static let minimumFreeBytes = 5 * 1024 * 1024
+
+    func ensureRoomForSession() throws {
+        let root = try root()
+        let fileManager = FileManager.default
+        let probe = fileManager.fileExists(atPath: root.path) ? root : root.deletingLastPathComponent()
+        guard fileManager.fileExists(atPath: probe.path) else {
+            throw RecordingStoreError.invalidBundle("Free space could not be read.")
+        }
+        let values = try probe.resourceValues(forKeys: [.volumeAvailableCapacityKey])
+        guard let bytes = values.volumeAvailableCapacity else {
+            throw RecordingStoreError.invalidBundle("Free space could not be read.")
+        }
+        guard Int64(bytes) >= Int64(Self.minimumFreeBytes) else {
+            throw RecordingStoreError.notEnoughStorage
+        }
+    }
+
+    func existingFolder(for id: UUID) throws -> URL {
+        let folder = try folderURL(for: id)
+        var isDirectory: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: folder.path, isDirectory: &isDirectory),
+              isDirectory.boolValue else {
+            throw RecordingStoreError.invalidBundle("The recording folder is missing.")
+        }
+        return folder
+    }
+
+    func summaryIfPresent(in folder: URL) throws -> MonitoringSummary? {
+        let url = folder.appendingPathComponent("summary.json")
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let data = try Data(contentsOf: url)
+        return try RecordingJSON.decode(MonitoringSummary.self, from: data)
+    }
+
+    func ensureBundle(matching summary: MonitoringSummary, in folder: URL) throws {
+        let bundle = bundleURL(for: summary.id, in: folder)
+        if FileManager.default.fileExists(atPath: bundle.path) {
+            return
+        }
+        let header = try readHeader(in: folder)
+        let samples = try readSamples(in: folder)
+        let events = try readEvents(in: folder)
+        guard summary.id == header.id,
+              summary.sampleCount == samples.count,
+              summary.startedAt == header.startedAt else {
+            throw RecordingStoreError.invalidBundle("The saved summary does not match the recording.")
+        }
+        let recording = SessionRecording(
+            schemaVersion: header.schemaVersion,
+            id: header.id,
+            sourcePlatform: RecordingValidator.sourcePlatform,
+            deviceModel: header.deviceModel,
+            watchAppVersion: header.watchAppVersion,
+            startedAt: header.startedAt,
+            settings: header.settings,
+            samples: samples,
+            events: events,
+            summary: summary
+        )
+        try writeFinished(recording, in: folder)
+    }
+
+    /// Deletes acknowledged finished recordings that are not among the newest `keeping`.
+    /// Unacknowledged recordings stay on the watch. Phase 7 calls this after the phone acks.
+    func pruneAcknowledged(
+        _ acknowledged: Set<UUID>,
+        keeping newestCount: Int = AppConstants.finishedRecordingsToKeep
+    ) throws {
+        guard newestCount >= 0 else { return }
+        let finished = try listings().filter(\.isFinalized)
+        let protected = Set(finished.prefix(newestCount).map(\.id))
+        for listing in finished where acknowledged.contains(listing.id) && !protected.contains(listing.id) {
+            try removeFolder(try existingFolder(for: listing.id))
+        }
     }
 
     func listings() throws -> [RecordingListing] {
