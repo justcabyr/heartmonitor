@@ -1,0 +1,311 @@
+[
+  {
+    "name": "1-minute buckets with a gap and a pause",
+    "intervalSeconds": 60,
+    "samples": [
+      { "t": 0, "bpm": 70 },
+      { "t": 30, "bpm": 80 },
+      { "t": 200, "bpm": 90 }
+    ],
+    "events": [
+      { "t": 240, "kind": "paused" },
+      { "t": 400, "kind": "resumed" }
+    ],
+    "expected": [
+      { "start": 0, "avg": 75, "min": 70, "max": 80, "count": 2 },
+      { "start": 60, "gap": true },
+      { "start": 120, "gap": true },
+      { "start": 180, "avg": 90, "min": 90, "max": 90, "count": 1 },
+      { "start": 240, "paused": true },
+      { "start": 300, "paused": true },
+      { "start": 360, "paused": true }
+    ],
+    "summary": {
+      "endOffset": 400,
+      "warningBPM": 100,
+      "targetBPM": 180,
+      "avgBPM": 80,
+      "minBPM": 70,
+      "maxBPM": 90,
+      "sampleCount": 3,
+      "activeSeconds": 240,
+      "pausedSeconds": 160,
+      "secondsAboveWarning": 0,
+      "secondsAboveTarget": 0,
+      "gapSeconds": 110
+    }
+  },
+  {
+    "name": "bucket avg min max and count",
+    "intervalSeconds": 60,
+    "samples": [
+      { "t": 0, "bpm": 60 },
+      { "t": 10, "bpm": 80 },
+      { "t": 20, "bpm": 100 },
+      { "t": 40, "bpm": 70 }
+    ],
+    "events": [],
+    "expected": [
+      { "start": 0, "avg": 77.5, "min": 60, "max": 100, "count": 4 }
+    ],
+    "summary": {
+      "endOffset": 40,
+      "warningBPM": 90,
+      "targetBPM": 120,
+      "avgBPM": 77.5,
+      "minBPM": 60,
+      "maxBPM": 100,
+      "sampleCount": 4,
+      "activeSeconds": 40,
+      "pausedSeconds": 0,
+      "secondsAboveWarning": 20,
+      "secondsAboveTarget": 0,
+      "gapSeconds": 0
+    }
+  },
+  {
+    "name": "empty buckets inside a span over 60 seconds are gaps",
+    "intervalSeconds": 60,
+    "samples": [
+      { "t": 0, "bpm": 70 },
+      { "t": 180, "bpm": 90 }
+    ],
+    "events": [],
+    "expected": [
+      { "start": 0, "avg": 70, "min": 70, "max": 70, "count": 1 },
+      { "start": 60, "gap": true },
+      { "start": 120, "gap": true },
+      { "start": 180, "avg": 90, "min": 90, "max": 90, "count": 1 }
+    ],
+    "summary": {
+      "endOffset": 180,
+      "warningBPM": 200,
+      "targetBPM": 220,
+      "avgBPM": 80,
+      "minBPM": 70,
+      "maxBPM": 90,
+      "sampleCount": 2,
+      "activeSeconds": 180,
+      "pausedSeconds": 0,
+      "secondsAboveWarning": 0,
+      "secondsAboveTarget": 0,
+      "gapSeconds": 120
+    }
+  },
+  {
+    "name": "a span of exactly 60 seconds is not a gap",
+    "intervalSeconds": 20,
+    "samples": [
+      { "t": 0, "bpm": 100 },
+      { "t": 60, "bpm": 110 }
+    ],
+    "events": [],
+    "expected": [
+      { "start": 0, "avg": 100, "min": 100, "max": 100, "count": 1 },
+      { "start": 60, "avg": 110, "min": 110, "max": 110, "count": 1 }
+    ],
+    "summary": {
+      "endOffset": 60,
+      "warningBPM": 150,
+      "targetBPM": 180,
+      "avgBPM": 105,
+      "minBPM": 100,
+      "maxBPM": 110,
+      "sampleCount": 2,
+      "activeSeconds": 60,
+      "pausedSeconds": 0,
+      "secondsAboveWarning": 0,
+      "secondsAboveTarget": 0,
+      "gapSeconds": 0
+    }
+  },
+  {
+    "name": "pauses are breaks and are not counted as gaps",
+    "intervalSeconds": 60,
+    "samples": [
+      { "t": 0, "bpm": 70 },
+      { "t": 300, "bpm": 90 }
+    ],
+    "events": [
+      { "t": 60, "kind": "paused" },
+      { "t": 300, "kind": "resumed" }
+    ],
+    "expected": [
+      { "start": 0, "avg": 70, "min": 70, "max": 70, "count": 1 },
+      { "start": 60, "paused": true },
+      { "start": 120, "paused": true },
+      { "start": 180, "paused": true },
+      { "start": 240, "paused": true },
+      { "start": 300, "avg": 90, "min": 90, "max": 90, "count": 1 }
+    ],
+    "summary": {
+      "endOffset": 300,
+      "warningBPM": 200,
+      "targetBPM": 220,
+      "avgBPM": 80,
+      "minBPM": 70,
+      "maxBPM": 90,
+      "sampleCount": 2,
+      "activeSeconds": 60,
+      "pausedSeconds": 240,
+      "secondsAboveWarning": 0,
+      "secondsAboveTarget": 0,
+      "gapSeconds": 0
+    }
+  },
+  {
+    "name": "time above warning includes time above target",
+    "intervalSeconds": 30,
+    "samples": [
+      { "t": 0, "bpm": 150 },
+      { "t": 30, "bpm": 180 },
+      { "t": 60, "bpm": 120 }
+    ],
+    "events": [],
+    "expected": [
+      { "start": 0, "avg": 150, "min": 150, "max": 150, "count": 1 },
+      { "start": 30, "avg": 180, "min": 180, "max": 180, "count": 1 },
+      { "start": 60, "avg": 120, "min": 120, "max": 120, "count": 1 }
+    ],
+    "summary": {
+      "endOffset": 90,
+      "warningBPM": 140,
+      "targetBPM": 170,
+      "avgBPM": 150,
+      "minBPM": 120,
+      "maxBPM": 180,
+      "sampleCount": 3,
+      "activeSeconds": 90,
+      "pausedSeconds": 0,
+      "secondsAboveWarning": 60,
+      "secondsAboveTarget": 30,
+      "gapSeconds": 0
+    }
+  },
+  {
+    "name": "held sample time is capped at 60 seconds and the rest is a gap",
+    "intervalSeconds": 60,
+    "samples": [
+      { "t": 0, "bpm": 200 },
+      { "t": 120, "bpm": 70 }
+    ],
+    "events": [],
+    "expected": [
+      { "start": 0, "avg": 200, "min": 200, "max": 200, "count": 1 },
+      { "start": 60, "gap": true },
+      { "start": 120, "avg": 70, "min": 70, "max": 70, "count": 1 }
+    ],
+    "summary": {
+      "endOffset": 120,
+      "warningBPM": 150,
+      "targetBPM": 180,
+      "avgBPM": 135,
+      "minBPM": 70,
+      "maxBPM": 200,
+      "sampleCount": 2,
+      "activeSeconds": 120,
+      "pausedSeconds": 0,
+      "secondsAboveWarning": 60,
+      "secondsAboveTarget": 60,
+      "gapSeconds": 60
+    }
+  },
+  {
+    "name": "a bucket that overlaps a pause is a break even inside a long gap",
+    "intervalSeconds": 30,
+    "samples": [
+      { "t": 0, "bpm": 190 },
+      { "t": 250, "bpm": 80 }
+    ],
+    "events": [
+      { "t": 100, "kind": "paused" },
+      { "t": 130, "kind": "resumed" }
+    ],
+    "expected": [
+      { "start": 0, "avg": 190, "min": 190, "max": 190, "count": 1 },
+      { "start": 30, "gap": true },
+      { "start": 60, "gap": true },
+      { "start": 90, "paused": true },
+      { "start": 120, "paused": true },
+      { "start": 150, "gap": true },
+      { "start": 180, "gap": true },
+      { "start": 210, "gap": true },
+      { "start": 240, "avg": 80, "min": 80, "max": 80, "count": 1 }
+    ],
+    "summary": {
+      "endOffset": 250,
+      "warningBPM": 150,
+      "targetBPM": 180,
+      "avgBPM": 135,
+      "minBPM": 80,
+      "maxBPM": 190,
+      "sampleCount": 2,
+      "activeSeconds": 220,
+      "pausedSeconds": 30,
+      "secondsAboveWarning": 60,
+      "secondsAboveTarget": 60,
+      "gapSeconds": 160
+    }
+  },
+  {
+    "name": "an open pause runs to the end and is excluded from active time",
+    "intervalSeconds": 10,
+    "samples": [
+      { "t": 0, "bpm": 80 }
+    ],
+    "events": [
+      { "t": 20, "kind": "paused" }
+    ],
+    "expected": [
+      { "start": 0, "avg": 80, "min": 80, "max": 80, "count": 1 },
+      { "start": 20, "paused": true },
+      { "start": 30, "paused": true },
+      { "start": 40, "paused": true }
+    ],
+    "summary": {
+      "endOffset": 50,
+      "warningBPM": 200,
+      "targetBPM": 220,
+      "avgBPM": 80,
+      "minBPM": 80,
+      "maxBPM": 80,
+      "sampleCount": 1,
+      "activeSeconds": 20,
+      "pausedSeconds": 30,
+      "secondsAboveWarning": 0,
+      "secondsAboveTarget": 0,
+      "gapSeconds": 0
+    }
+  },
+  {
+    "name": "10-hour synthetic session",
+    "intervalSeconds": 60,
+    "synthetic": {
+      "durationSeconds": 36000,
+      "sampleEverySeconds": 5,
+      "baseBPM": 80,
+      "bpmModulus": 10
+    },
+    "expectedSummary": {
+      "bucketCount": 601,
+      "gapBuckets": 0,
+      "pausedBuckets": 0,
+      "first": { "start": 0, "avg": 83.83333333333333, "min": 80, "max": 89, "count": 12 },
+      "last": { "start": 36000, "avg": 80, "min": 80, "max": 80, "count": 1 }
+    },
+    "summary": {
+      "endOffset": 36000,
+      "warningBPM": 200,
+      "targetBPM": 220,
+      "avgBPM": 84.4993750867935,
+      "minBPM": 80,
+      "maxBPM": 89,
+      "sampleCount": 7201,
+      "activeSeconds": 36000,
+      "pausedSeconds": 0,
+      "secondsAboveWarning": 0,
+      "secondsAboveTarget": 0,
+      "gapSeconds": 0
+    }
+  }
+]
