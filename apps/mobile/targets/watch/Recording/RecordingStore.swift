@@ -193,6 +193,7 @@ struct RecordingListing: Identifiable, Equatable {
     let id: UUID
     let startedAt: Date
     let sampleCount: Int
+    let activeSeconds: TimeInterval
     let isFinalized: Bool
 }
 
@@ -323,16 +324,33 @@ struct RecordingStore {
             }
             let samples = try readSamples(in: folder)
             let finalized = fileManager.fileExists(atPath: bundleURL(for: id, in: folder).path)
+            let activeSeconds: TimeInterval
             if finalized {
                 let data = try Data(contentsOf: bundleURL(for: id, in: folder))
                 let recording = try RecordingJSON.decode(SessionRecording.self, from: data)
                 try RecordingValidator.validate(recording)
+                activeSeconds = recording.summary.activeSeconds
+            } else {
+                let events = try readEvents(in: folder)
+                let endOffset = max(
+                    samples.map(\.offset).max() ?? 0,
+                    events.map(\.offset).max() ?? 0
+                )
+                activeSeconds = SummaryCalculator.calculate(
+                    samples: samples,
+                    events: events,
+                    endOffset: endOffset,
+                    warningBPM: header.settings.warningBPM,
+                    targetBPM: header.settings.targetBPM,
+                    gapThreshold: SummaryCalculator.gapThresholdSeconds
+                ).activeSeconds
             }
             listings.append(
                 RecordingListing(
                     id: id,
                     startedAt: header.startedAt,
                     sampleCount: samples.count,
+                    activeSeconds: activeSeconds,
                     isFinalized: finalized
                 )
             )

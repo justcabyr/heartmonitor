@@ -23,6 +23,7 @@ struct RecordingsDebugView: View {
                 ForEach(listings) { listing in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(listing.startedAt, format: .dateTime.month(.abbreviated).day().hour().minute())
+                        Text("Duration \(SessionClock.string(from: listing.activeSeconds))")
                         Text("\(listing.sampleCount) samples")
                         Text(listing.id.uuidString.lowercased().prefix(8))
                             .font(.caption2)
