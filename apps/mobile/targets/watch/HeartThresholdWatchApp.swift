@@ -4,10 +4,12 @@ import WatchKit
 @main
 struct HeartThresholdWatchApp: App {
     @WKApplicationDelegateAdaptor(WatchAppDelegate.self) private var appDelegate
+    @StateObject private var monitor = HeartRateMonitor()
 
     var body: some Scene {
         WindowGroup {
             StartView()
+                .environmentObject(monitor)
         }
     }
 }
