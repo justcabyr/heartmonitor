@@ -3,3 +3,6 @@ node_modules/
 .swiftpm/
 DerivedData/
 *.xcuserstate
+apps/mobile/ios/
+apps/mobile/android/
+apps/mobile/.expo/
