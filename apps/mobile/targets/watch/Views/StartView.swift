@@ -45,13 +45,6 @@ struct StartView: View {
                     .buttonStyle(.borderedProminent)
                     .disabled(isStarting)
                 }
-                Button {
-                    showSettings = true
-                } label: {
-                    Image(systemName: "gearshape")
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Alert settings")
                 if let errorMessage = monitor.errorMessage {
                     Text(errorMessage)
                         .font(.caption2)
@@ -63,6 +56,12 @@ struct StartView: View {
                     RecordingsDebugView()
                 }
                 #endif
+                Button("Settings") {
+                    showSettings = true
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .accessibilityLabel("Alert settings")
             }
             .padding()
             .navigationDestination(isPresented: $showLive) {
