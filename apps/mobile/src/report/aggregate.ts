@@ -80,6 +80,19 @@ const isLongGapBucket = (
   return false;
 };
 
+export const spansAreSeparated = (
+  from: number,
+  to: number,
+  events: SessionEvent[],
+  endOffset: number,
+  gapThreshold: number = gapThresholdSeconds,
+): boolean => {
+  const start = Math.min(from, to);
+  const end = Math.max(from, to);
+  const pauses = pauseIntervals(events, endOffset);
+  return activeDuration(start, end, pauses) > gapThreshold || overlapsPause(start, end, pauses);
+};
+
 export const aggregate = (
   samples: HeartRateSample[],
   events: SessionEvent[],

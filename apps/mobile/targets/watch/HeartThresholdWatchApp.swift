@@ -32,6 +32,7 @@ final class WatchAppDelegate: NSObject, WKApplicationDelegate {
 
     func applicationDidFinishLaunching() {
         monitor.prepareForLaunchRecovery()
+        monitor.startRecordingTransfer()
         Task { @MainActor in
             await Task.yield()
             monitor.recoverInterruptedSessionIfNeeded()

@@ -1,0 +1,9 @@
+{
+  "name": "watch-bridge",
+  "version": "1.0.0",
+  "private": true,
+  "description": "WatchConnectivity inbox for HeartThreshold recordings",
+  "license": "MIT",
+  "author": "HeartThreshold",
+  "homepage": "https://github.com/justcabyr/heartthreshold"
+}
