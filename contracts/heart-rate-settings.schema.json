@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "heart-rate-settings.schema.json",
+  "title": "HeartRateSettings",
+  "description": "Alert settings edited on the watch. Ranges are UX limits, not medical advice.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "targetBPM",
+    "warningFraction",
+    "warningCooldown",
+    "thresholdCooldown",
+    "hysteresisBPM",
+    "staleTimeout",
+    "batteryGuardLevel",
+    "saveToHealth"
+  ],
+  "properties": {
+    "targetBPM": {
+      "type": "number",
+      "minimum": 60,
+      "maximum": 230,
+      "description": "Alert target in beats per minute."
+    },
+    "warningFraction": {
+      "type": "number",
+      "minimum": 0.5,
+      "maximum": 0.99,
+      "description": "Warning level as a fraction of targetBPM. warningBPM is targetBPM * warningFraction."
+    },
+    "warningCooldown": {
+      "type": "number",
+      "minimum": 5,
+      "maximum": 600,
+      "description": "Seconds between repeated warning haptics while heart rate stays in the warning zone."
+    },
+    "thresholdCooldown": {
+      "type": "number",
+      "minimum": 5,
+      "maximum": 600,
+      "description": "Seconds between repeated threshold haptics while heart rate stays at or above the target."
+    },
+    "hysteresisBPM": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 20,
+      "description": "Heart rate must fall this far below a boundary before that boundary can alert again."
+    },
+    "staleTimeout": {
+      "type": "number",
+      "minimum": 1,
+      "maximum": 120,
+      "description": "Seconds without a fresh sample before alerts and the live display treat the reading as stale."
+    },
+    "batteryGuardLevel": {
+      "type": "number",
+      "minimum": 0.05,
+      "maximum": 0.3,
+      "description": "Fraction of battery remaining that ends the session. 0.10 is 10%."
+    },
+    "saveToHealth": {
+      "type": "boolean",
+      "description": "When false, the workout is discarded and the app recording is the data of record."
+    }
+  }
+}
