@@ -71,6 +71,9 @@ struct StartView: View {
                 }
             }
             .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    RecordingTransfer.sendFinishedRecordings()
+                }
                 if phase == .background {
                     monitor.flushRecording()
                 }

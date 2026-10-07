@@ -382,6 +382,30 @@ struct RecordingStore {
         }
     }
 
+    /// Finished session ids, without reading sample files.
+    func finalizedIDs() throws -> [UUID] {
+        let root = try root()
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: root.path) else { return [] }
+        let folders = try fileManager.contentsOfDirectory(
+            at: root,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        )
+        var ids: [UUID] = []
+        for folder in folders {
+            let values = try folder.resourceValues(forKeys: [.isDirectoryKey])
+            guard values.isDirectory == true else { continue }
+            guard let id = UUID(uuidString: folder.lastPathComponent) else {
+                throw RecordingStoreError.invalidBundle("A session folder name is not an id.")
+            }
+            if fileManager.fileExists(atPath: bundleURL(for: id, in: folder).path) {
+                ids.append(id)
+            }
+        }
+        return ids
+    }
+
     func listings() throws -> [RecordingListing] {
         let root = try root()
         let fileManager = FileManager.default
@@ -440,6 +464,11 @@ struct RecordingStore {
 
     private func folderURL(for id: UUID) throws -> URL {
         try root().appendingPathComponent(id.uuidString.lowercased(), isDirectory: true)
+    }
+
+    func bundleFile(for id: UUID) throws -> URL {
+        let folder = try existingFolder(for: id)
+        return bundleURL(for: id, in: folder)
     }
 
     private func bundleURL(for id: UUID, in folder: URL) -> URL {

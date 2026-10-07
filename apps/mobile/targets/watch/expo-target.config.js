@@ -5,7 +5,7 @@ module.exports = {
   displayName: 'HeartThreshold',
   bundleIdentifier: '.watchkitapp',
   deploymentTarget: '10.0',
-  frameworks: ['HealthKit'],
+  frameworks: ['HealthKit', 'WatchConnectivity'],
   entitlements: {
     'com.apple.developer.healthkit': true,
   },

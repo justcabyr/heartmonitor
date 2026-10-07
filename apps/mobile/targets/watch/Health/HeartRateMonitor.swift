@@ -101,6 +101,13 @@ final class HeartRateMonitor: NSObject, ObservableObject {
         }
     }
 
+    func startRecordingTransfer() {
+        RecordingTransfer.bind { [weak self] message in
+            self?.errorMessage = message
+        }
+        RecordingTransfer.start()
+    }
+
     var stateTitle: String {
         switch sessionState {
         case .idle:
