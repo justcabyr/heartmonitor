@@ -2,49 +2,67 @@ import SwiftUI
 import ThresholdEngine
 
 struct LiveView: View {
+    @Environment(\.isLuminanceReduced) private var isLuminanceReduced
     @EnvironmentObject private var monitor: HeartRateMonitor
-    @Environment(\.dismiss) private var dismiss
-    @State private var confirmEnd = false
 
     var body: some View {
-        TimelineView(.periodic(from: .now, by: 1)) { context in
-            VStack(spacing: 6) {
-                Image(systemName: "heart.fill")
-                    .foregroundStyle(.red)
-                Text(bpmText)
-                    .font(.system(size: 48, weight: .semibold, design: .rounded))
-                    .minimumScaleFactor(0.6)
-                Text("BPM")
-                Text(monitor.stateTitle)
+        Group {
+            if isLuminanceReduced {
+                liveContent(elapsed: monitor.displayedElapsed)
+            } else {
+                TimelineView(.periodic(from: .now, by: 1)) { context in
+                    liveContent(elapsed: monitor.elapsedTime(at: context.date))
+                }
+            }
+        }
+        .transaction { transaction in
+            if isLuminanceReduced {
+                transaction.disablesAnimations = true
+            }
+        }
+        .onChange(of: isLuminanceReduced, initial: true) { _, reduced in
+            monitor.setWristDown(reduced)
+        }
+    }
+
+    private func liveContent(elapsed: TimeInterval) -> some View {
+        VStack(spacing: 6) {
+            Image(systemName: "heart.fill")
+                .foregroundStyle(monitor.zone.tint)
+            Text(bpmText)
+                .font(.system(size: 48, weight: .semibold, design: .rounded))
+                .minimumScaleFactor(0.6)
+                .foregroundStyle(bpmColor)
+            Text("BPM")
+                .foregroundStyle(bpmColor)
+            Text(statusText)
+                .foregroundStyle(monitor.sessionState == .paused ? Color.secondary : monitor.zone.tint)
+            Text(SessionClock.string(from: elapsed))
+                .font(.title3.monospacedDigit())
+            Text("Alert \(targetText) · warn \(warningText)")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+            if let batteryText {
+                Text(batteryText)
+                    .font(.caption2)
                     .foregroundStyle(.secondary)
-                Text(Self.clock(monitor.elapsedTime(at: context.date)))
-                    .font(.title3.monospacedDigit())
-                if let errorMessage = monitor.errorMessage {
-                    Text(errorMessage)
-                        .font(.caption2)
-                        .foregroundStyle(.red)
-                        .multilineTextAlignment(.center)
-                }
-                Button(monitor.sessionState == .ended ? "Done" : "End") {
-                    if monitor.sessionState == .ended {
-                        dismiss()
-                    } else {
-                        confirmEnd = true
-                    }
-                }
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            }
+            if let errorMessage = monitor.errorMessage {
+                Text(errorMessage)
+                    .font(.caption2)
+                    .foregroundStyle(.red)
+                    .multilineTextAlignment(.center)
             }
         }
-        .confirmationDialog("End session?", isPresented: $confirmEnd, titleVisibility: .visible) {
-            Button("End", role: .destructive) {
-                Task {
-                    await monitor.stopMonitoring(saveToHealth: HeartRateSettings.startScreen.saveToHealth)
-                    if monitor.errorMessage == nil {
-                        dismiss()
-                    }
-                }
-            }
-            Button("Keep going", role: .cancel) {}
+    }
+
+    private var statusText: String {
+        if monitor.sessionState == .paused {
+            return "Paused"
         }
+        return monitor.zone.title
     }
 
     private var bpmText: String {
@@ -52,15 +70,40 @@ struct LiveView: View {
         return String(Int(currentBPM.rounded()))
     }
 
-    private static func clock(_ elapsed: TimeInterval) -> String {
-        let total = max(0, Int(elapsed))
-        let hours = total / 3600
-        let minutes = (total % 3600) / 60
-        let seconds = total % 60
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, seconds)
+    private var bpmColor: Color {
+        monitor.zone == .stale ? .gray : .primary
+    }
+
+    private var batteryText: String? {
+        guard let level = monitor.batteryLevel, level >= 0 else { return nil }
+        let percent = Int((level * 100).rounded())
+        guard let remaining = monitor.batterySecondsRemaining else {
+            return "\(percent)%"
         }
-        return String(format: "%d:%02d", minutes, seconds)
+        return "\(percent)% · \(SessionClock.string(from: remaining)) left"
+    }
+
+    private var targetText: String {
+        String(Int(monitor.settings.targetBPM.rounded()))
+    }
+
+    private var warningText: String {
+        String(Int(monitor.settings.warningBPM.rounded()))
+    }
+}
+
+extension HeartRateZone {
+    var tint: Color {
+        switch self {
+        case .normal:
+            return .green
+        case .warning:
+            return .orange
+        case .threshold:
+            return .red
+        case .stale:
+            return .gray
+        }
     }
 }
 
